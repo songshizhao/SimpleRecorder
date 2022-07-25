@@ -20,6 +20,7 @@ using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.UI.ViewManagement;
+using Windows.Media.Capture;
 
 namespace SimpleRecorder
 {
@@ -28,7 +29,7 @@ namespace SimpleRecorder
         public MainPage()
         {
             InitializeComponent();
-            
+
             ApplicationView.GetForCurrentView().SetPreferredMinSize(
                new Size(350, 200));
 
@@ -65,7 +66,25 @@ namespace SimpleRecorder
 
         private async void ToggleButton_Checked(object sender, RoutedEventArgs e)
         {
+            MediaCapture mediaCapture = new MediaCapture();
             var button = (ToggleButton)sender;
+            try
+            {
+                var settings = new MediaCaptureInitializationSettings();
+                settings.StreamingCaptureMode = StreamingCaptureMode.Audio;
+                await mediaCapture.InitializeAsync(settings);
+
+            }
+            catch (Exception)
+            {
+                //Microphone access not allowed
+                await new MessageDialog("Microphone access not allowed.").ShowAsync();
+                button.IsChecked = false;
+                await Launcher.LaunchUriAsync(
+                    new Uri("ms-settings:privacy-microphone", UriKind.RelativeOrAbsolute));
+                return;
+            }
+            finally { mediaCapture.Dispose(); }
 
             // Get our encoder properties
             var frameRate = uint.Parse(((string)FrameRateComboBox.SelectedItem).Replace("fps", ""));
@@ -115,8 +134,8 @@ namespace SimpleRecorder
                 using (_encoder = new Encoder(_device, item))
                 {
                     await _encoder.EncodeAsync(
-                        stream, 
-                        width, height, bitrate, 
+                        stream,
+                        width, height, bitrate,
                         frameRate);
                 }
                 MainTextBlock.Foreground = originalBrush;
@@ -222,7 +241,7 @@ namespace SimpleRecorder
         private AppSettings GetCachedSettings()
         {
             var localSettings = ApplicationData.Current.LocalSettings;
-            var result =  new AppSettings
+            var result = new AppSettings
             {
                 Quality = VideoEncodingQuality.HD1080p,
                 FrameRate = 60,
